@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>画像付き！旅ガチャ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #eef2f5;
+      padding: 30px 15px;
+    }
+
+    /* ガチャマシン本体 */
+    .machine {
+      width: 300px;
+      margin: 0 auto;
+      background: linear-gradient(145deg, #ff5252, #d32f2f);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      position: relative;
+    }
+
+    /* カプセルが入る透明ドーム */
+    .dome {
+      width: 220px;
+      height: 160px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.6);
+      border: 4px solid #ffffff;
+      border-radius: 110px 110px 20px 20px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.15);
+    }
+
+    /* ドーム内の中身 */
+    .capsule-cluster {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+      padding: 0 10px;
+      line-height: 1.4;
+    }
+
+    .capsule-cluster.shake {
+      animation: shake 0.1s infinite;
+    }
+
+    /* パネルとハンドル */
+    .panel {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .handle-wrapper {
+      width: 70px;
+      height: 70px;
+      margin: 10px auto;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .handle-knob {
+      width: 100%;
+      height: 20px;
+      background: #bbb;
+      border-radius: 10px;
+      position: absolute;
+      top: 25px;
+      box-shadow: 0 4px 0 #888;
+      transition: transform 0.8s ease-in-out;
+    }
+
+    .handle-knob::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background: #555;
+      border-radius: 50%;
+      top: -2px;
+      left: 23px;
+    }
+
+    /* ハンドル回転 */
+    .handle-knob.rotate {
+      transform: rotate(360deg);
+    }
+
+    /* 出口とカプセル落下アニメーション */
+    .outlet {
+      width: 100px;
+      height: 70px;
+      background: #222;
+      margin: 15px auto 0;
+      border-radius: 10px 10px 0 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dropped-capsule {
+      font-size: 45px;
+      position: absolute;
+      top: -50px;
+      left: 27px;
+      opacity: 0;
+    }
+
+    .dropped-capsule.drop {
+      animation: dropDown 0.5s ease-out forwards;
+    }
+
+    /* キーフレームアニメーション */
+    @keyframes shake {
+      0% { transform: translate(0, 0); }
+      50% { transform: translate(2px, -2px); }
+      100% { transform: translate(-2px, 2px); }
+    }
+
+    @keyframes dropDown {
+      0% { top: -50px; opacity: 0; transform: scale(0.5) rotate(0deg); }
+      70% { top: 10px; opacity: 1; transform: scale(1.1) rotate(180deg); }
+      100% { top: 10px; opacity: 1; transform: scale(1) rotate(360deg); }
+    }
+
+    /* 結果モーダル */
+    .result-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .result-card {
+      background: white;
+      padding: 20px;
+      border-radius: 16px;
+      max-width: 400px;
+      width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      text-align: left;
+      animation: popUp 0.3s ease-out;
+    }
+
+    @keyframes popUp {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .destination-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #d32f2f;
+      border-bottom: 2px solid #d32f2f;
+      padding-bottom: 5px;
+      margin-bottom: 15px;
+    }
+
+    .spot-item {
+      margin-bottom: 15px;
+      background: #f8fafc;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+
+    .spot-img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .spot-info {
+      padding: 10px;
+    }
+
+    .spot-name {
+      font-weight: bold;
+      color: #333;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .spot-desc {
+      color: #666;
+      font-size: 13px;
+    }
+
+    .close-btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: #333;
+      color: white;
+      text-align: center;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-top: 15px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="machine">
+    <div class="dome">
+      <div class="capsule-cluster" id="cluster">旅行行き先<br>ガチャ</div>
+    </div>
+
+    <div class="panel">
+      <div style="font-weight:bold; color:#444;">100円を入れる</div>
+      <div class="handle-wrapper" onclick="turnHandle()">
+        <div class="handle-knob" id="knob"></div>
+      </div>
+      <small style="color:#777;">タップして回す！</small>
+    </div>
+
+    <div class="outlet">
+      <div class="dropped-capsule" id="capsule">🎁</div>
+    </div>
+  </div>
+
+  <!-- 結果ポップアップ -->
+  <div class="result-overlay" id="overlay">
+    <div class="result-card">
+      <div style="text-align:center; font-size:24px; font-weight:bold; margin-bottom:10px;">✨ 決定！ ✨</div>
+      <div class="destination-title" id="destName"></div>
+      <div id="spotList"></div>
+      <button class="close-btn" onclick="closeResult()">もう一回まわす</button>
+    </div>
+  </div>
+
+  <script>
+    let isPlaying = false;
+
+    // フォルダ内のすべての画像を反映したデータリスト
+   const travelData = [
+      {
+        area: "北海道（札幌・小樽）",
+        spots: [
+          { 
+            name: "📍 小樽運河", 
+            desc: "レトロな倉庫街が立ち並ぶ幻想的なエリア。",
+            img: "otaru.jpg",
+            url: "https://otaru.gr.jp/" 
+          },
+          { 
+            name: "📍 白い恋人パーク", 
+            desc: "お菓子のテーマパークで体験も充実。",
+            img: "siroikoibitopa-ku.jpg",
+            url: "https://www.shiroikoibitopark.jp/"
+          },
+          { 
+            name: "📍 札幌場外市場", 
+            desc: "新鮮な海鮮丼をその場で味わえます。",
+            img: "jougaisijou.jpg",
+            url: "https://www.jyogaiichiba.com/"
+          }
+        ]
+      },
+      {
+        area: "東京都（浅草・タワーエリア）",
+        spots: [
+          { 
+            name: "📍 浅草寺＆仲見世通り", 
+            desc: "伝統的な下町情緒を感じる定番スポット。",
+            img: "sennsouji.png",
+            url: "https://www.senso-ji.jp/"
+          },
+          { 
+            name: "📍 東京タワー", 
+            desc: "昭和レトロ感と美しい夜景が魅力。",
+            img: "toukyoutawa-.png",
+            url: "https://www.tokyotower.co.jp/"
+          },
+          { 
+            name: "📍 チームラボプラネッツ", 
+            desc: "水に入る没入型デジタルアート。",
+            img: "ti-murabo.png",
+            url: "https://www.teamlab.art/jp/e/planets/"
+          }
+        ]
+      },
+      {
+        area: "京都府（嵐山・祇園）",
+        spots: [
+          { 
+            name: "📍 渡月橋・嵐山", 
+            desc: "四季折々の景色が楽しめる名勝地。",
+            img: "arasiyama.png",
+            url: "https://arashiyamahoshokai.com/"
+          },
+          { 
+            name: "📍 伏見稲荷大社", 
+            desc: "鮮やかな朱色の千本鳥居が見どころ。",
+            img: "fujsimiinari.png",
+            url: "http://inari.jp/"
+          },
+          { 
+            name: "📍 八坂の塔・祇園周辺", 
+            desc: "石畳の街並みと歴史ある雰囲気が魅力。",
+            img: "gion.png",
+            url: "https://www.yasaka-jinja.or.jp/"
+          }
+        ]
+      },
+      {
+        area: "沖縄県（本島エリア）",
+        spots: [
+          { 
+            name: "📍 沖縄美ら海水族館", 
+            desc: "巨大水槽を泳ぐジンベエザメが圧巻。",
+            img: "tyuraumi.jpg",
+            url: "https://churaumi.okinawa/"
+          },
+          { 
+            name: "📍 古宇利大橋", 
+            desc: "エメラルドグリーンの海を走る絶景ドライブ。",
+            img: "kosouoohasi.jpg",
+            url: "https://www.nakijin.jp/"
+          },
+          { 
+            name: "📍 国際通り", 
+            desc: "沖縄料理とお土産選びを満喫できるメインストリート。",
+            img: "kokusaidouri.png",
+            url: "https://naha-kokusaidori.okinawa/"
+          }
+        ]
+      }
+    ];
+
+    function turnHandle() {
+      if (isPlaying) return;
+      isPlaying = true;
+
+      const knob = document.getElementById("knob");
+      const cluster = document.getElementById("cluster");
+      const capsule = document.getElementById("capsule");
+
+      capsule.classList.remove("drop");
+
+      knob.classList.add("rotate");
+      cluster.classList.add("shake");
+
+      setTimeout(() => {
+        cluster.classList.remove("shake");
+        capsule.classList.add("drop");
+      }, 800);
+
+      setTimeout(() => {
+        showResult();
+        knob.classList.remove("rotate");
+        isPlaying = false;
+      }, 1500);
+    }
+
+    function showResult() {
+      const selected = travelData[Math.floor(Math.random() * travelData.length)];
+      document.getElementById("destName").textContent = selected.area;
+
+      const spotList = document.getElementById("spotList");
+      spotList.innerHTML = "";
+
+      selected.spots.forEach(spot => {
+        const item = document.createElement("div");
+        item.className = "spot-item";
+        item.innerHTML = `
+         <a href="${spot.url}" target="_blank" rel="noopener noreferrer" class="spot-link">
+            <img src="${spot.img}" alt="${spot.name}" class="spot-img">
+          </a>
+          <div class="spot-info">
+            <div class="spot-name">${spot.name}</div>
+            <div class="spot-desc">${spot.desc}</div>
+          </div>
+        `;
+        spotList.appendChild(item);
+      });
+
+      document.getElementById("overlay").style.display = "flex";
+    }
+
+    function closeResult() {
+      document.getElementById("overlay").style.display = "none";
+      document.getElementById("capsule").classList.remove("drop");
+    }
+  </script>
+
+</body>
+</html>
